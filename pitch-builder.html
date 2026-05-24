@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pitch Builder · Y7 Chinese</title>
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<script src="app.js?v=1"></script>
+<script>renderHeader('pitch');</script>
+
+<main class="container">
+  <h1 class="page-title">⭐ Pitch Builder</h1>
+  <p class="page-subtitle">Tap chips from each word bank. Your pitch builds live at the bottom of the page. Saves automatically.</p>
+
+  <div class="box-coral">
+    <strong>Your name:</strong>
+    <input type="text" id="myName" placeholder="e.g. Tom" style="margin-top:6px;max-width:300px">
+  </div>
+
+  <div class="tabs" id="memberTabs">
+    <button data-member="1" class="active">Family Member 1</button>
+    <button data-member="2">Family Member 2</button>
+  </div>
+
+  <!-- Element ① — Identify -->
+  <div class="step" data-step="who">
+    <div class="step-header"><span class="step-num">①</span><span class="step-title">Identify</span></div>
+    <div class="step-pattern">Zhè shì wǒ de ___.</div>
+    <div class="muted" style="font-size:13px;margin-bottom:8px">Pick which family member or pet you'll auction.</div>
+    <div class="chip-bank" id="who-bank"></div>
+  </div>
+
+  <!-- Element ② — Name -->
+  <div class="step" data-step="name">
+    <div class="step-header"><span class="step-num">②</span><span class="step-title">Name</span></div>
+    <div class="step-pattern">Wǒ de ___ jiào ___.</div>
+    <div class="muted" style="font-size:13px;margin-bottom:6px">Type their name (English or pinyin OK).</div>
+    <input type="text" id="nameInput" placeholder="e.g. Sarah" style="max-width:300px">
+  </div>
+
+  <!-- Element ③ — Age -->
+  <div class="step" data-step="age">
+    <div class="step-header"><span class="step-num">③</span><span class="step-title">Age</span></div>
+    <div class="step-pattern">Wǒ de ___ ___ suì.   <span class="coral bold">⚠ NO shì!</span></div>
+    <div class="chip-bank" id="age-bank"></div>
+  </div>
+
+  <!-- Element ④ — Nationality -->
+  <div class="step" data-step="country">
+    <div class="step-header"><span class="step-num">④</span><span class="step-title">Nationality</span></div>
+    <div class="step-pattern">Tā shì ___ rén.   <span class="coral bold">⚠ Always finish with rén!</span></div>
+    <div class="chip-bank" id="country-bank"></div>
+  </div>
+
+  <!-- Element ⑤ — Description -->
+  <div class="step" data-step="desc">
+    <div class="step-header"><span class="step-num">⑤</span><span class="step-title">Description</span></div>
+    <div class="step-pattern">Wǒ de ___ hěn ___, [hé / dànshì] hěn ___.</div>
+    <h3 style="margin-top:8px;font-size:14px;color:var(--coral)">Pick 1 appearance</h3>
+    <div class="chip-bank" id="appearance-bank"></div>
+    <h3 style="font-size:14px;color:var(--coral)">Pick a linker</h3>
+    <div class="chip-bank" id="linker-bank"></div>
+    <h3 style="font-size:14px;color:var(--coral)">Pick 1 personality</h3>
+    <div class="chip-bank" id="personality-bank"></div>
+  </div>
+
+  <!-- Element ⑥ — Location -->
+  <div class="step" data-step="city">
+    <div class="step-header"><span class="step-num">⑥</span><span class="step-title">Location</span></div>
+    <div class="step-pattern">Tā zhù zài ___.</div>
+    <div class="chip-bank" id="city-bank"></div>
+  </div>
+
+  <div class="button-row">
+    <button class="secondary small" onclick="clearMember()">Clear this family member</button>
+    <button class="ghost small" onclick="clearAllProgress()">Reset everything</button>
+    <button class="small" onclick="window.print()">🖨 Print cue cards</button>
+  </div>
+
+  <!-- Live preview -->
+  <div class="pitch-preview" id="preview">
+    <h2>Your pitch — live preview</h2>
+    <div class="preview-text" id="preview-text"></div>
+    <div class="meta">
+      <span id="word-count">0 words</span>
+      <span id="time-est">~ 0 sec spoken</span>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* ============================================================
+   Y7 Pitch Builder logic — 6 elements (①–⑥)
+   ============================================================ */
+const blank = '<span class="blank">___</span>';
+
+const state = (function () {
+  const s = loadState();
+  if (!s.pitch) s.pitch = {};
+  if (!s.pitch.myName) s.pitch.myName = '';
+  if (!s.pitch.member1) s.pitch.member1 = emptyMember();
+  if (!s.pitch.member2) s.pitch.member2 = emptyMember();
+  return s.pitch;
+})();
+
+let currentMember = 1;
+
+function emptyMember() {
+  return { who: null, name: '', age: null, country: null, appearance: null, personality: null, linker: null, city: null };
+}
+
+function persist() {
+  saveState({ pitch: state });
+}
+
+/* ----------- Build chip banks ----------- */
+function makeChip(item, group) {
+  const span = document.createElement('span');
+  span.className = 'chip';
+  span.dataset.group = group;
+  span.dataset.pinyin = item.pinyin;
+  const speaker = makeSpeaker(item.char || item.pinyin);
+  if (speaker) span.appendChild(speaker);
+  const label = document.createElement('span');
+  label.innerHTML = `${item.pinyin} <span class="chip-en">${item.en}</span>`;
+  span.appendChild(label);
+  span.addEventListener('click', () => {
+    pick(group, item);
+  });
+  return span;
+}
+
+function fillBank(id, list, group) {
+  const bank = document.getElementById(id);
+  bank.innerHTML = '';
+  list.forEach(item => bank.appendChild(makeChip(item, group)));
+}
+
+fillBank('who-bank',         VOCAB.family,       'who');
+fillBank('age-bank',         VOCAB.ages,         'age');
+fillBank('country-bank',     VOCAB.countries,    'country');
+fillBank('appearance-bank',  VOCAB.appearance,   'appearance');
+fillBank('personality-bank', VOCAB.personality,  'personality');
+fillBank('linker-bank',      VOCAB.linkers,      'linker');
+fillBank('city-bank',        VOCAB.cities,       'city');
+
+/* ----------- Member tabs ----------- */
+document.getElementById('memberTabs').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  document.querySelectorAll('#memberTabs button').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  currentMember = +e.target.dataset.member;
+  syncUI();
+});
+
+/* ----------- Name input ----------- */
+const myNameInput = document.getElementById('myName');
+myNameInput.value = state.myName || '';
+myNameInput.addEventListener('input', () => {
+  state.myName = myNameInput.value;
+  persist();
+  render();
+});
+
+const nameInput = document.getElementById('nameInput');
+nameInput.addEventListener('input', () => {
+  state['member' + currentMember].name = nameInput.value;
+  persist();
+  render();
+});
+
+/* ----------- Pick a chip ----------- */
+function pick(group, item) {
+  const m = state['member' + currentMember];
+  m[group] = item;
+  persist();
+  syncUI();
+}
+
+function clearMember() {
+  if (!confirm('Clear this family member\'s answers?')) return;
+  state['member' + currentMember] = emptyMember();
+  persist();
+  syncUI();
+}
+
+/* ----------- Sync UI to state ----------- */
+function syncUI() {
+  const m = state['member' + currentMember];
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  ['who','age','country','appearance','personality','linker','city'].forEach(g => {
+    if (m[g]) {
+      const chip = document.querySelector(`.chip[data-group="${g}"][data-pinyin="${cssEscape(m[g].pinyin)}"]`);
+      if (chip) chip.classList.add('selected');
+    }
+  });
+  nameInput.value = m.name || '';
+  render();
+}
+
+function cssEscape(s) { return s.replace(/"/g, '\\"'); }
+
+/* ----------- Render preview ----------- */
+function render() {
+  const p = state;
+  const m1 = p.member1, m2 = p.member2;
+  const lines = [];
+
+  // Optional greet (not graded, but encouraged)
+  lines.push(`<span class="muted">[optional greet]</span> Nǐ hǎo! Wǒ jiào <strong>${p.myName ? p.myName : blank}</strong>.`);
+
+  // Member 1 — Elements ①–⑥
+  lines.push(`<br><span class="muted">— Family Member 1 —</span>`);
+  lines.push(memberLines(m1));
+
+  // Member 2 — Elements ①–⑥
+  lines.push(`<br><span class="muted">— Family Member 2 —</span>`);
+  lines.push(memberLines(m2));
+
+  // Optional close
+  lines.push(`<br><span class="muted">[optional close]</span> Xièxie. Zàijiàn!`);
+
+  document.getElementById('preview-text').innerHTML = lines.join('<br>');
+
+  // Word count + time estimate (~2 syllables per second at presentation pace)
+  const text = document.getElementById('preview-text').textContent;
+  const filledOnly = text.replace(/___/g, '').replace(/\[optional[^\]]*\]/g, '').trim().split(/\s+/).filter(Boolean).length;
+  const seconds = Math.round(filledOnly / 2);
+  document.getElementById('word-count').textContent = `${filledOnly} spoken words`;
+  document.getElementById('time-est').textContent = `~ ${seconds} sec at presentation pace`;
+}
+
+function memberLines(m) {
+  const who   = m.who         ? m.who.pinyin                                             : blank;
+  const whoCh = m.who         ? `<span class="char">(${m.who.char})</span>`              : '';
+  const name  = m.name        ? m.name                                                    : blank;
+  const age   = m.age         ? m.age.pinyin                                             : blank;
+  const ctry  = m.country     ? m.country.pinyin                                         : blank;
+  const app   = m.appearance  ? m.appearance.pinyin                                      : blank;
+  const link  = m.linker      ? m.linker.pinyin                                          : 'hé';
+  const pers  = m.personality ? m.personality.pinyin                                     : blank;
+  const city  = m.city        ? m.city.pinyin                                            : blank;
+
+  return [
+    `<strong>①</strong> Zhè shì wǒ de <strong>${who}</strong>. ${whoCh}`,
+    `<strong>②</strong> Wǒ de <strong>${who}</strong> jiào <strong>${name}</strong>.`,
+    `<strong>③</strong> Wǒ de <strong>${who}</strong> <strong>${age}</strong> suì.`,
+    `<strong>④</strong> Tā shì <strong>${ctry}</strong>.`,
+    `<strong>⑤</strong> Wǒ de <strong>${who}</strong> hěn <strong>${app}</strong>, <strong>${link}</strong> hěn <strong>${pers}</strong>.`,
+    `<strong>⑥</strong> Tā zhù zài <strong>${city}</strong>.`,
+  ].join('<br>');
+}
+
+/* Init */
+syncUI();
+</script>
+
+</body>
+</html>

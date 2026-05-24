@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sentence Builder · Y7 Chinese</title>
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<script src="app.js?v=1"></script>
+<script>renderHeader('sentence');</script>
+
+<main class="container">
+  <h1 class="page-title">🔤 Sentence Builder</h1>
+  <p class="page-subtitle">Read the English. Tap the pinyin words in the right order. Distractor words try to trick you — leave them in the pool.</p>
+
+  <div class="sb-progress"><div class="sb-progress-fill" id="progressFill" style="width:0%"></div></div>
+  <p class="muted" id="progressText" style="text-align:center;font-size:13px;margin-bottom:12px"></p>
+
+  <div class="box">
+    <div class="muted" style="font-size:13px">English meaning</div>
+    <div class="sb-target"><strong id="enTarget"></strong></div>
+    <div id="sentenceSpeakRow" style="margin-top:6px"></div>
+
+    <h3 style="font-size:13px;color:var(--coral);margin-top:14px">Tap words in the right order:</h3>
+    <div class="sb-built" id="builtBox"></div>
+
+    <h3 style="font-size:13px;color:var(--grey);margin-top:14px">Word pool</h3>
+    <div class="sb-pool" id="poolBox"></div>
+
+    <div class="sb-feedback" id="feedback"></div>
+
+    <div class="button-row">
+      <button onclick="checkAnswer()">Check answer</button>
+      <button class="secondary" onclick="resetSentence()">Reset</button>
+      <button class="ghost small" onclick="showAnswer()">Show answer</button>
+      <button class="ghost small" onclick="nextSentence()">Skip →</button>
+    </div>
+  </div>
+
+  <div class="box-blue" style="margin-top:18px">
+    <strong>Score:</strong> <span id="scoreText">0 / 0 correct</span>
+    &nbsp;·&nbsp;
+    <button class="ghost small" onclick="restartAll()">↻ Start over</button>
+  </div>
+
+</main>
+
+<script>
+let sentenceOrder = shuffle(SENTENCES.map((_, i) => i));
+let sentencePtr = 0;
+let built = [];
+let pool = [];
+let score = 0;
+let attempts = 0;
+let answeredThis = false;
+
+function currentSentence() {
+  return SENTENCES[sentenceOrder[sentencePtr]];
+}
+
+function loadSentence() {
+  const s = currentSentence();
+  document.getElementById('enTarget').textContent = s.en;
+  built = [];
+  pool = shuffle([...s.correct, ...s.distractors]);
+  answeredThis = false;
+  document.getElementById('feedback').className = 'sb-feedback';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('builtBox').classList.remove('correct', 'wrong');
+  const speakRow = document.getElementById('sentenceSpeakRow');
+  speakRow.innerHTML = '';
+  if (s.cn) {
+    const sp = makeSpeaker(s.cn);
+    if (sp) {
+      sp.classList.add('speak-inline');
+      speakRow.appendChild(sp);
+      const lbl = document.createElement('span');
+      lbl.className = 'muted';
+      lbl.style.fontSize = '12px';
+      lbl.textContent = 'Hear the full Chinese sentence';
+      speakRow.appendChild(lbl);
+    }
+  }
+  render();
+  updateProgress();
+}
+
+function render() {
+  const builtBox = document.getElementById('builtBox');
+  const poolBox = document.getElementById('poolBox');
+  builtBox.innerHTML = '';
+  poolBox.innerHTML = '';
+
+  built.forEach((t, i) => {
+    const tok = makeToken(t);
+    tok.addEventListener('click', () => {
+      built.splice(i, 1);
+      pool.push(t);
+      render();
+    });
+    builtBox.appendChild(tok);
+  });
+
+  pool.forEach((t, i) => {
+    const tok = makeToken(t);
+    tok.addEventListener('click', () => {
+      built.push(t);
+      pool.splice(i, 1);
+      render();
+    });
+    poolBox.appendChild(tok);
+  });
+}
+
+function makeToken(text) {
+  const span = document.createElement('span');
+  span.className = 'sb-token';
+  span.textContent = text;
+  return span;
+}
+
+function checkAnswer() {
+  const s = currentSentence();
+  const correct = s.correct;
+  attempts++;
+  let isRight = built.length === correct.length && built.every((t, i) => t === correct[i]);
+  const fb = document.getElementById('feedback');
+  const builtBox = document.getElementById('builtBox');
+  if (isRight) {
+    if (!answeredThis) score++;
+    answeredThis = true;
+    fb.textContent = '✓ Correct! ' + correct.join(' ');
+    fb.className = 'sb-feedback show correct';
+    builtBox.classList.add('correct');
+  } else {
+    fb.innerHTML = `✗ Not quite. Try again — or hit <em>Show answer</em> if stuck.`;
+    fb.className = 'sb-feedback show wrong';
+    builtBox.classList.add('wrong');
+    setTimeout(() => builtBox.classList.remove('wrong'), 800);
+  }
+  updateScore();
+}
+
+function showAnswer() {
+  const s = currentSentence();
+  built = [...s.correct];
+  pool = [...s.distractors];
+  render();
+  const fb = document.getElementById('feedback');
+  fb.textContent = 'Answer: ' + s.correct.join(' ');
+  fb.className = 'sb-feedback show correct';
+  document.getElementById('builtBox').classList.add('correct');
+  answeredThis = true;
+}
+
+function resetSentence() {
+  loadSentence();
+}
+
+function nextSentence() {
+  sentencePtr = (sentencePtr + 1) % sentenceOrder.length;
+  loadSentence();
+}
+
+function updateProgress() {
+  const pct = Math.round((sentencePtr / sentenceOrder.length) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `Sentence ${sentencePtr + 1} of ${sentenceOrder.length}`;
+}
+
+function updateScore() {
+  document.getElementById('scoreText').textContent = `${score} / ${attempts} attempts correct`;
+}
+
+function restartAll() {
+  sentenceOrder = shuffle(SENTENCES.map((_, i) => i));
+  sentencePtr = 0;
+  score = 0;
+  attempts = 0;
+  loadSentence();
+  updateScore();
+}
+
+/* Init */
+loadSentence();
+updateScore();
+</script>
+
+</body>
+</html>

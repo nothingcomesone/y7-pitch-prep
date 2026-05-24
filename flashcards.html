@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flashcards · Y7 Chinese</title>
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<script src="app.js?v=1"></script>
+<script>renderHeader('flashcards');</script>
+
+<main class="container">
+  <h1 class="page-title">🃏 Flashcards</h1>
+  <p class="page-subtitle">Pick a deck. Tap the card to flip. Or switch to Match mode to play against the clock.</p>
+
+  <div class="deck-picker" id="deckPicker">
+    <button data-deck="family"      class="active">Family (8)</button>
+    <button data-deck="appearance">Appearance (4)</button>
+    <button data-deck="personality">Personality (4)</button>
+    <button data-deck="countries">Nationalities (5)</button>
+    <button data-deck="cities">Cities (4)</button>
+  </div>
+
+  <div class="tabs" id="modeTabs">
+    <button data-mode="flip" class="active">Flip cards</button>
+    <button data-mode="match">Match game</button>
+  </div>
+
+  <!-- ============ Flip mode ============ -->
+  <div id="flipMode">
+    <div class="flashcard" id="flashcard" onclick="flipCard()">
+      <div id="cardContent"></div>
+      <div class="flip-hint">Tap to flip</div>
+    </div>
+    <div class="flashcard-controls">
+      <button class="secondary" onclick="prevCard()">← Previous</button>
+      <button onclick="nextCard()">Next →</button>
+      <button class="ghost small" onclick="shuffleDeck()">🔀 Shuffle</button>
+    </div>
+    <div class="flashcard-progress" id="flipProgress"></div>
+  </div>
+
+  <!-- ============ Match mode ============ -->
+  <div id="matchMode" style="display:none">
+    <div class="match-status">
+      <span id="matchScore">Matches: 0 / 0</span>
+      <button class="ghost small" onclick="startMatch()">🔄 New game</button>
+    </div>
+    <div class="match-board" id="matchBoard"></div>
+    <p class="muted" style="text-align:center;font-size:13px">Tap an English card, then tap the matching pinyin card. Match all pairs to win.</p>
+  </div>
+
+</main>
+
+<script>
+let activeDeck = 'family';
+let mode = 'flip';
+
+let deckCards = [];
+let cardIndex = 0;
+let showPinyin = false;
+
+/* ============ Deck switching ============ */
+document.getElementById('deckPicker').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  document.querySelectorAll('#deckPicker button').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  activeDeck = e.target.dataset.deck;
+  resetForDeck();
+});
+
+document.getElementById('modeTabs').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  document.querySelectorAll('#modeTabs button').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  mode = e.target.dataset.mode;
+  document.getElementById('flipMode').style.display = mode === 'flip' ? 'block' : 'none';
+  document.getElementById('matchMode').style.display = mode === 'match' ? 'block' : 'none';
+  if (mode === 'match') startMatch();
+});
+
+function resetForDeck() {
+  deckCards = shuffle(VOCAB[activeDeck]);
+  cardIndex = 0;
+  showPinyin = false;
+  if (mode === 'flip') renderCard();
+  else startMatch();
+}
+
+/* ============ Flip mode ============ */
+function renderCard() {
+  const c = deckCards[cardIndex];
+  if (!c) return;
+  const content = document.getElementById('cardContent');
+  content.innerHTML = '';
+  if (showPinyin) {
+    const pinyinDiv = document.createElement('div');
+    pinyinDiv.className = 'face-pinyin';
+    pinyinDiv.textContent = c.pinyin;
+    const charDiv = document.createElement('div');
+    charDiv.className = 'face-char';
+    charDiv.textContent = c.char;
+    content.appendChild(pinyinDiv);
+    content.appendChild(charDiv);
+    const speaker = makeSpeaker(c.char || c.pinyin, { size: 'lg' });
+    if (speaker) {
+      speaker.classList.add('face-speaker');
+      content.appendChild(speaker);
+    }
+  } else {
+    const en = document.createElement('div');
+    en.className = 'face-en';
+    en.textContent = c.en;
+    content.appendChild(en);
+  }
+  document.getElementById('flipProgress').textContent = `Card ${cardIndex + 1} of ${deckCards.length}`;
+}
+
+function flipCard() {
+  showPinyin = !showPinyin;
+  renderCard();
+}
+
+function nextCard() {
+  cardIndex = (cardIndex + 1) % deckCards.length;
+  showPinyin = false;
+  renderCard();
+}
+
+function prevCard() {
+  cardIndex = (cardIndex - 1 + deckCards.length) % deckCards.length;
+  showPinyin = false;
+  renderCard();
+}
+
+function shuffleDeck() {
+  deckCards = shuffle(deckCards);
+  cardIndex = 0;
+  showPinyin = false;
+  renderCard();
+}
+
+/* ============ Match mode ============ */
+let matchSelected = null;
+let matchScore = 0;
+let matchTotal = 0;
+
+function startMatch() {
+  const board = document.getElementById('matchBoard');
+  board.innerHTML = '';
+  matchSelected = null;
+  matchScore = 0;
+
+  // Take up to 6 random items from the active deck (decks may be smaller for Y7)
+  const pick = shuffle(VOCAB[activeDeck]).slice(0, Math.min(6, VOCAB[activeDeck].length));
+  matchTotal = pick.length;
+
+  const enTiles = pick.map(item => ({ id: item.pinyin, label: item.en, side: 'en' }));
+  const pyTiles = pick.map(item => ({ id: item.pinyin, label: item.pinyin, side: 'py' }));
+
+  const enShuf = shuffle(enTiles);
+  const pyShuf = shuffle(pyTiles);
+
+  for (let i = 0; i < pick.length; i++) {
+    board.appendChild(makeMatchTile(enShuf[i]));
+    board.appendChild(makeMatchTile(pyShuf[i]));
+  }
+  updateMatchScore();
+}
+
+function makeMatchTile(t) {
+  const div = document.createElement('div');
+  div.className = 'match-tile' + (t.side === 'py' ? ' pinyin' : '');
+  div.dataset.id = t.id;
+  div.dataset.side = t.side;
+  div.textContent = t.label;
+  div.addEventListener('click', () => onMatchTileClick(div));
+  return div;
+}
+
+function onMatchTileClick(tile) {
+  if (tile.classList.contains('matched')) return;
+  if (!matchSelected) {
+    tile.classList.add('selected');
+    matchSelected = tile;
+    return;
+  }
+  if (matchSelected === tile) {
+    tile.classList.remove('selected');
+    matchSelected = null;
+    return;
+  }
+  if (tile.dataset.side === matchSelected.dataset.side) {
+    matchSelected.classList.remove('selected');
+    tile.classList.add('selected');
+    matchSelected = tile;
+    return;
+  }
+  if (tile.dataset.id === matchSelected.dataset.id) {
+    tile.classList.remove('selected');
+    matchSelected.classList.remove('selected');
+    tile.classList.add('matched');
+    matchSelected.classList.add('matched');
+    matchScore++;
+    updateMatchScore();
+    matchSelected = null;
+    if (matchScore === matchTotal) {
+      setTimeout(() => alert('🎉 All matched! Try a new game?'), 300);
+    }
+  } else {
+    tile.classList.add('wrong');
+    matchSelected.classList.add('wrong');
+    const t1 = tile, t2 = matchSelected;
+    setTimeout(() => {
+      t1.classList.remove('wrong', 'selected');
+      t2.classList.remove('wrong', 'selected');
+    }, 600);
+    matchSelected = null;
+  }
+}
+
+function updateMatchScore() {
+  document.getElementById('matchScore').textContent = `Matches: ${matchScore} / ${matchTotal}`;
+}
+
+/* ============ Init ============ */
+resetForDeck();
+</script>
+
+</body>
+</html>
