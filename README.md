@@ -1,6 +1,6 @@
 # Y7 Pitch Prep — Static Website
 
-A standalone, no-backend web tool for Year 7 Chinese students preparing for the **Family Charity Auction** (Task 2, Term 2 2026, St Augustine's College Sydney). Auction day: **Monday 1 June**.
+A standalone, no-backend web tool for Year 7 Chinese students preparing for the **Family Pitch** (Task 2, Term 2 2026). Pitch day: **Monday 1 June**.
 
 ## What's inside
 

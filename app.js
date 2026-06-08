@@ -1,6 +1,6 @@
 /* ============================================================
    Y7 Pitch Prep — Shared vocabulary + utilities
-   Year 7 Term 2 Task 2 (The Family Charity Auction)
+   Year 7 Term 2 Task 2 (The Family Pitch)
    ============================================================ */
 
 /* Vocab is restricted to what Year 7 has actually been taught
@@ -234,45 +234,4 @@ function speak(text, opts = {}) {
     const file = _audioManifest && _audioManifest[text];
     if (!file || !_audioEl) { _speakFallback(text, opts); return; }
     try {
-      if (TTS_SUPPORTED) window.speechSynthesis.cancel();
-      _audioEl.pause();
-      _audioEl.src = 'audio/' + file;
-      _audioEl.currentTime = 0;
-      const p = _audioEl.play();
-      if (p && typeof p.catch === 'function') p.catch(() => _speakFallback(text, opts));
-    } catch (e) {
-      _speakFallback(text, opts);
-    }
-  };
-  if (_audioManifest) { play(); } else { _loadManifest().then(play); }
-}
-
-function makeSpeaker(text, opts = {}) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'speak-btn' + (opts.size === 'lg' ? ' speak-btn-lg' : '');
-  btn.setAttribute('aria-label', 'Play pronunciation: ' + text);
-  btn.title = 'Play pronunciation';
-  btn.textContent = '🔊';
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    e.preventDefault();
-    btn.classList.add('speaking');
-    speak(text, opts);
-    setTimeout(() => btn.classList.remove('speaking'), 800);
-  });
-  return btn;
-}
-
-function attachSpeakers(root = document) {
-  root.querySelectorAll('[data-speak]').forEach(el => {
-    if (el.dataset.speakAttached) return;
-    el.dataset.speakAttached = '1';
-    const btn = makeSpeaker(el.dataset.speak, { size: el.dataset.speakSize === 'lg' ? 'lg' : 'sm' });
-    btn.classList.add('speak-inline');
-    el.insertBefore(btn, el.firstChild);
-  });
-}
-if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => attachSpeakers());
-}
+      if (TTS_SUPPORTED) window.speechSynthesis.cancel()
